@@ -25,7 +25,7 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#include "capturetofile.h"
+#include "CaptureFilePass.h"
 #include "../../Falcor/Falcor.h"
 #include "../../Falcor/Core/API/Texture.h"
 #include <Utils/Timing/Clock.h>
@@ -34,17 +34,17 @@ using namespace Falcor;
 
 extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
 {
-    registry.registerClass<RenderPass, capturetofile>();
+    registry.registerClass<RenderPass, CaptureFilePass>();
 }
 
-capturetofile::capturetofile(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice) {}
+CaptureFilePass::CaptureFilePass(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice) {}
 
-Properties capturetofile::getProperties() const
+Properties CaptureFilePass::getProperties() const
 {
     return {};
 }
 
-RenderPassReflection capturetofile::reflect(const CompileData& compileData)
+RenderPassReflection CaptureFilePass::reflect(const CompileData& compileData)
 {
     // Define the required resources here
     //RenderPassReflection reflector;
@@ -59,7 +59,7 @@ RenderPassReflection capturetofile::reflect(const CompileData& compileData)
     return reflector;
 }
 
-void capturetofile::execute(RenderContext* pRenderContext, const RenderData& renderData)
+void CaptureFilePass::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
     static int frame = 0;
     auto save_gbuffer = [&](std::string name)
@@ -83,4 +83,4 @@ void capturetofile::execute(RenderContext* pRenderContext, const RenderData& ren
     //save_gbuffer("target");
     //pRenderContext->blit(pSrcTex->getSRV(), pDstTex->getRTV());
 }
-void capturetofile::renderUI(Gui::Widgets& widget) {}
+void CaptureFilePass::renderUI(Gui::Widgets& widget) {}

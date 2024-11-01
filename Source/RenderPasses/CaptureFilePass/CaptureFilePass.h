@@ -31,17 +31,17 @@
 
 using namespace Falcor;
 
-class capturetofile : public RenderPass
+class CaptureFilePass : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(capturetofile, "capturetofile", "Insert pass description here.");
+    FALCOR_PLUGIN_CLASS(CaptureFilePass, "CaptureFilePass", "Insert pass description here.");
 
-    static ref<capturetofile> create(ref<Device> pDevice, const Properties& props)
+    static ref<CaptureFilePass> create(ref<Device> pDevice, const Properties& props)
     {
-        return make_ref<capturetofile>(pDevice, props);
+        return make_ref<CaptureFilePass>(pDevice, props);
     }
 
-    capturetofile(ref<Device> pDevice, const Properties& props);
+    CaptureFilePass(ref<Device> pDevice, const Properties& props);
 
     virtual Properties getProperties() const override;
     virtual RenderPassReflection reflect(const CompileData& compileData) override;

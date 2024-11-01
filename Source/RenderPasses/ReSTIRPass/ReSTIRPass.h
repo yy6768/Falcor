@@ -28,13 +28,22 @@
 #pragma once
 #include "Falcor.h"
 #include "RenderGraph/RenderPass.h"
+#include "RenderGraph/RenderPassHelpers.h"
+#include "Utils/Debug/PixelDebug.h"
+#include "Utils/Sampling/SampleGenerator.h"
+#include "Rendering/Lights/LightBVHSampler.h"
+#include "Rendering/Lights/EmissivePowerSampler.h"
+#include "Rendering/Lights/EnvMapSampler.h"
+
 
 using namespace Falcor;
-
+/*
+  Custom ReSTIRPass
+*/
 class ReSTIRPass : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(ReSTIRPass, "ReSTIRPass", "Insert pass description here.");
+    FALCOR_PLUGIN_CLASS(ReSTIRPass, "ReSTIRPass", "ReSTIRPass");
 
     static ref<ReSTIRPass> create(ref<Device> pDevice, const Properties& props)
     {
@@ -53,4 +62,13 @@ public:
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
 
 private:
+    // Frame-based methods
+    bool beginFrame(RenderContext* pRenderContext, const RenderData& renderData);
+    void endFrame(RenderContext* pRenderContext, const RenderData& renderData);
+
+
+    struct StaticParams
+    {
+        uint32_t samplesPerPixel = 1;
+    }
 };
