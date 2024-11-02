@@ -70,5 +70,5 @@ private:
     struct StaticParams
     {
         uint32_t samplesPerPixel = 1;
-    }
+    };
 };
