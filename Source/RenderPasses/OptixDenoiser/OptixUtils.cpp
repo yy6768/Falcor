@@ -56,6 +56,8 @@ void optixLogCallback(unsigned int level, const char* tag, const char* message, 
     Falcor::logWarning("[Optix][{:2}][{:12}]: {}", level, tag, message);
 }
 
+//OptixFunctionTable g_optixFunctionTable;
+
 // This initialization now seems verbose / excessive as CUDA and OptiX initialization
 // has evolved.  TODO: Simplify?
 OptixDeviceContext initOptix(Falcor::Device* pDevice)

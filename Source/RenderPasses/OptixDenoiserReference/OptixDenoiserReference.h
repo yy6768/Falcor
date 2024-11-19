@@ -31,28 +31,26 @@
 
 using namespace Falcor;
 
-class capturetofile : public RenderPass
+class OptixDenoiserReference : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(capturetofile, "capturetofile", "Insert pass description here.");
+    FALCOR_PLUGIN_CLASS(OptixDenoiserReference, "OptixDenoiserReference", "Insert pass description here.");
 
-    static ref<capturetofile> create(ref<Device> pDevice, const Properties& props)
+    static ref<OptixDenoiserReference> create(ref<Device> pDevice, const Properties& props)
     {
-        return make_ref<capturetofile>(pDevice, props);
+        return make_ref<OptixDenoiserReference>(pDevice, props);
     }
 
-    capturetofile(ref<Device> pDevice, const Properties& props);
+    OptixDenoiserReference(ref<Device> pDevice, const Properties& props);
 
     virtual Properties getProperties() const override;
     virtual RenderPassReflection reflect(const CompileData& compileData) override;
     virtual void compile(RenderContext* pRenderContext, const CompileData& compileData) override {}
     virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
     virtual void renderUI(Gui::Widgets& widget) override;
-    virtual void setScene(RenderContext* pRenderContext, const ref<Scene>& pScene) override;
+    virtual void setScene(RenderContext* pRenderContext, const ref<Scene>& pScene) override {}
     virtual bool onMouseEvent(const MouseEvent& mouseEvent) override { return false; }
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
 
-
 private:
-    ref<Scene> mpScene;
 };

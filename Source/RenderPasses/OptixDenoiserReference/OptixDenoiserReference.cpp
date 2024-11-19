@@ -25,34 +25,43 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-#pragma once
-#include "Falcor.h"
-#include "RenderGraph/RenderPass.h"
+#include "OptixDenoiserReference.h"
 
-using namespace Falcor;
-
-class capturetofile : public RenderPass
+extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
 {
-public:
-    FALCOR_PLUGIN_CLASS(capturetofile, "capturetofile", "Insert pass description here.");
+    registry.registerClass<RenderPass, OptixDenoiserReference>();
+}
 
-    static ref<capturetofile> create(ref<Device> pDevice, const Properties& props)
+OptixDenoiserReference::OptixDenoiserReference(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice) {}
+
+Properties OptixDenoiserReference::getProperties() const
+{
+    return {};
+}
+
+RenderPassReflection OptixDenoiserReference::reflect(const CompileData& compileData)
+{
+    // Define the required resources here
+    RenderPassReflection reflector;
+    reflector.addInput("color", "color");
+    return reflector;
+}
+
+void OptixDenoiserReference::execute(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    static int frame = 0;
+    auto pTexture = renderData.getTexture("color");
+    std::ostringstream oss;
+    oss << "G:/data/bistro1png/denoiser/frame" << std::setw(4) << std::setfill('0') << frame << ".exr";
+    //std::filesystem::path path = "G:/data/falcor/reference/reference" + std::to_string(frame) + ".exr";
+    if (frame == 0 || frame == 127)
     {
-        return make_ref<capturetofile>(pDevice, props);
+        pTexture->captureToFile(0, 0, oss.str(), Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
+        //frame++;
     }
+    frame++;
+    // renderData holds the requested resources
+    // auto& pTexture = renderData.getTexture("src");
+}
 
-    capturetofile(ref<Device> pDevice, const Properties& props);
-
-    virtual Properties getProperties() const override;
-    virtual RenderPassReflection reflect(const CompileData& compileData) override;
-    virtual void compile(RenderContext* pRenderContext, const CompileData& compileData) override {}
-    virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
-    virtual void renderUI(Gui::Widgets& widget) override;
-    virtual void setScene(RenderContext* pRenderContext, const ref<Scene>& pScene) override;
-    virtual bool onMouseEvent(const MouseEvent& mouseEvent) override { return false; }
-    virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
-
-
-private:
-    ref<Scene> mpScene;
-};
+void OptixDenoiserReference::renderUI(Gui::Widgets& widget) {}

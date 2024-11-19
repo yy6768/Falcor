@@ -31,17 +31,17 @@
 
 using namespace Falcor;
 
-class capturetofile : public RenderPass
+class ExrtoTexture : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(capturetofile, "capturetofile", "Insert pass description here.");
+    FALCOR_PLUGIN_CLASS(ExrtoTexture, "ExrtoTexture", "Insert pass description here.");
 
-    static ref<capturetofile> create(ref<Device> pDevice, const Properties& props)
+    static ref<ExrtoTexture> create(ref<Device> pDevice, const Properties& props)
     {
-        return make_ref<capturetofile>(pDevice, props);
+        return make_ref<ExrtoTexture>(pDevice, props);
     }
 
-    capturetofile(ref<Device> pDevice, const Properties& props);
+    ExrtoTexture(ref<Device> pDevice, const Properties& props);
 
     virtual Properties getProperties() const override;
     virtual RenderPassReflection reflect(const CompileData& compileData) override;
@@ -52,7 +52,7 @@ public:
     virtual bool onMouseEvent(const MouseEvent& mouseEvent) override { return false; }
     virtual bool onKeyEvent(const KeyboardEvent& keyEvent) override { return false; }
 
-
 private:
+    ref<Texture> mpTex;
     ref<Scene> mpScene;
 };

@@ -29,6 +29,7 @@
 #include "../../Falcor/Falcor.h"
 #include "../../Falcor/Core/API/Texture.h"
 #include <Utils/Timing/Clock.h>
+#include <fstream>
 using namespace Falcor;
 
 
@@ -50,13 +51,19 @@ RenderPassReflection capturetofile::reflect(const CompileData& compileData)
     //RenderPassReflection reflector;
     RenderPassReflection reflector;
     //reflector.addInput("input", "the source texture");
-    reflector.addInput("albedo", "albedo");
-    reflector.addInput("color", "color");
-    reflector.addInput("depth", "depth");
+    //reflector.addInput("albedo", "albedo");
+    //reflector.addInput("color", "color");
+    //reflector.addInput("depth", "depth");
     reflector.addInput("normal", "normal");
-    //reflector.addInput("target", "target");
+    //reflector.addInput("posw", "posw");
+    //reflector.addInput("mov", "mov");
     
     return reflector;
+}
+
+void capturetofile::setScene(RenderContext* pRenderContext, const ref<Scene>& pScene)
+{
+    mpScene = pScene;
 }
 
 void capturetofile::execute(RenderContext* pRenderContext, const RenderData& renderData)
@@ -68,19 +75,62 @@ void capturetofile::execute(RenderContext* pRenderContext, const RenderData& ren
         auto ext = Bitmap::getFileExtFromResourceFormat(pTexture->getFormat());
         std::filesystem::path path = "G:/data/falcor/" + name + "/" + name + std::to_string(frame) + "." + ext;
         if (name != "albedo")
-            pTexture->captureToFile(0, 0, path, Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
+        {
+           pTexture->captureToFile(0, 0, path, Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
+        }
         else
+        {
             pTexture->captureToFile(0, 0, path, Bitmap::FileFormat::PngFile, Bitmap::ExportFlags::None, true);
+        }
     };
-    if(frame < 256)
+    auto save_camera = [&](std::string name)
     {
-        save_gbuffer("albedo");
-        save_gbuffer("color");
-        save_gbuffer("depth");
+        std::filesystem::path path = "G:/data/falcor/" + name + "/" + name + std::to_string(frame) + ".txt";
+        std::ofstream outFile(path);
+        const auto& camera = mpScene->getCamera();
+        float3 camera_position = camera->getPosition();
+        float3 camera_up = camera->getUpVector();
+        float3 camera_tagert = camera->getTarget();
+        float4x4 camera_view = camera->getViewMatrix();
+        // std::cout << camera_position.x << " " << camera_position.y << " " << camera_position.z;
+        if (outFile.is_open())
+        {
+            if (name == "camera_position")
+                outFile << camera_position.x << " " << camera_position.y << " " << camera_position.z << std::endl;
+            else if (name == "camera_up" )
+                outFile << camera_up.x << " " << camera_up.y << " " << camera_up.z << std::endl;
+            else if (name == "camera_tagert")
+                outFile << camera_tagert.x << " " << camera_tagert.y << " " << camera_tagert.z << std::endl;
+            else if (name == "camera_view")
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    outFile << camera_view.getRow(i).x << " " << camera_view.getRow(i).y << " " << camera_view.getRow(i).z << " "
+                            << camera_view.getRow(i).w
+                            << std::endl;
+                }
+            }
+
+            outFile.close();
+        }
+    };
+    //std::cout << pTextureb << "   "<<pTexturea  << std::endl;
+    if (frame==0 && mpScene)
+    {
+        //save_gbuffer("albedo");
+        //save_gbuffer("color");
+        //save_gbuffer("depth");
         save_gbuffer("normal");
+        //save_gbuffer("posw");
+        //save_gbuffer("mov");
+        //std::cout << "---------------    " << frame << "  ";
+        //save_camera("camera_position");
+        //save_camera("camera_up");
+        //save_camera("camera_tagert");
+        //save_camera("camera_view");
         frame++;
     }
-    //save_gbuffer("target");
-    //pRenderContext->blit(pSrcTex->getSRV(), pDstTex->getRTV());
+    //std::cout << "---------------    " << frame << "  ";
+    //frame++;
 }
 void capturetofile::renderUI(Gui::Widgets& widget) {}

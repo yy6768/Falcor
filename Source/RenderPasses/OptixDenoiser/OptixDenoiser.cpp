@@ -26,6 +26,9 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 #include "OptixDenoiser.h"
+#include <fstream>
+#include <string>
+
 
 FALCOR_ENUM_INFO(
     OptixDenoiserModelKind,
@@ -280,7 +283,7 @@ void OptixDenoiser_::freeStagingBuffer(Interop& interop, OptixImage2D& image)
 
 void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    if (mEnabled && mpScene)
+    if (mEnabled )
     {
         if (mRecreateDenoiser)
         {
@@ -307,12 +310,51 @@ void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& re
         }
         if (mHasNormalInput && mDenoiser.options.guideNormal)
         {
+            //std::cout << mDenoiser.options.guideNormal << "       ";
+
+            mCamera = Camera::create("Custom Camera");
+
+            // 读取相机参数
+            std::ifstream posFile("G:/data/frame0000/camera_position.txt");
+            float x, y, z;
+            posFile >> x >> y >> z;
+            float3 eyePosition = float3(x, y, z);
+            posFile.close();
+
+            std::ifstream targetFile("G:/data/frame0000/camera_target.txt");
+            targetFile >> x >> y >> z;
+            float3 targetPosition = float3(x, y, z);
+            targetFile.close();
+
+            std::ifstream upFile("G:/data/frame0000/camera_up.txt");
+            upFile >> x >> y >> z;
+            float3 upVector = float3(x, y, z);
+            upFile.close();
+
+            // 设置相机参数
+            mCamera->setPosition(eyePosition);
+            mCamera->setTarget(targetPosition);
+            mCamera->setUpVector(upVector);
+
+            // 预计算并存储矩阵
+            mViewMatrix = mCamera->getViewMatrix();
+            mInvViewMatrix = transpose(inverse(mViewMatrix));
+            /* for (int i = 0; i < 4; i++)
+            {
+                std::string row = "";
+                for (int j = 0; j < 4; j++)
+                {
+                    row += fmt::format("{:.6f} ", mInvViewMatrix[i][j]);
+                }
+                //logInfo(row);
+            }*/
+
             convertNormalsToBuf(
                 pRenderContext,
                 renderData.getTexture(kNormalInput),
                 mDenoiser.interop.normal.buffer,
                 mBufferSize,
-                transpose(inverse(mpScene->getCamera()->getViewMatrix()))
+                mInvViewMatrix
             );
         }
         if (mHasMotionInput && mDenoiser.modelKind == OptixDenoiserModelKind::OPTIX_DENOISER_MODEL_KIND_TEMPORAL)

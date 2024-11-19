@@ -233,4 +233,7 @@ private:
      * Get a device pointer from a buffer.  This wrapper gracefully handles nullptrs (i.e., if buf == nullptr)
      */
     void* exportBufferToCudaDevice(ref<Buffer>& buf);
+    ref<Camera> mCamera;
+    float4x4 mViewMatrix;
+    float4x4 mInvViewMatrix;
 };
