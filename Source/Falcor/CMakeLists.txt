@@ -1058,3 +1058,18 @@ endif()
 if(FALCOR_LINUX)
     file(GENERATE OUTPUT ${FALCOR_OUTPUT_DIRECTORY}/setpath.sh INPUT ${CMAKE_SOURCE_DIR}/build_scripts/setpath.sh.in)
 endif()
+
+# Find TensorRT
+find_package(TensorRT REQUIRED)
+
+target_link_libraries(Falcor 
+    PRIVATE 
+    ${TENSORRT_LIBRARIES}
+    nvinfer
+    nvonnxparser
+)
+
+target_include_directories(Falcor 
+    PRIVATE 
+    ${TENSORRT_INCLUDE_DIRS}
+)
