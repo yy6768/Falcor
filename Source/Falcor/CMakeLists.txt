@@ -1,3 +1,6 @@
+# Add cmake modules path
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 add_library(Falcor SHARED)
 
 target_sources(Falcor PRIVATE
@@ -1060,16 +1063,25 @@ if(FALCOR_LINUX)
 endif()
 
 # Find TensorRT
+# 在find_package(TensorRT)之前添加
+set(TENSORRT_ROOT "${CMAKE_SOURCE_DIR}/external/packman/TensorRT")
+set(TENSORRT_INCLUDE_DIR "${TENSORRT_ROOT}/include")
+set(TENSORRT_LIBRARY "${TENSORRT_ROOT}/lib/nvinfer_10.lib")
+set(TENSORRT_PARSER_LIBRARY "${TENSORRT_ROOT}/lib/nvonnxparser_10.lib")
+
+# 打印路径以便调试
+
+# Find TensorRT
 find_package(TensorRT REQUIRED)
 
-target_link_libraries(Falcor 
-    PRIVATE 
+target_link_libraries(Falcor
+    PRIVATE
     ${TENSORRT_LIBRARIES}
     nvinfer
     nvonnxparser
 )
 
-target_include_directories(Falcor 
-    PRIVATE 
+target_include_directories(Falcor
+    PRIVATE
     ${TENSORRT_INCLUDE_DIRS}
 )
