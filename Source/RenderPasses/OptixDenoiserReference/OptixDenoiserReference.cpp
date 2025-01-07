@@ -52,14 +52,14 @@ void OptixDenoiserReference::execute(RenderContext* pRenderContext, const Render
     static int frame = 0;
     auto pTexture = renderData.getTexture("color");
     std::ostringstream oss;
-    oss << "G:/data/bistro1png/denoiser/frame" << std::setw(4) << std::setfill('0') << frame << ".exr";
+    oss << "G:/data/denoised_with_temporal_1spp/frame" << std::setw(4) << std::setfill('0') << frame << ".png";
     //std::filesystem::path path = "G:/data/falcor/reference/reference" + std::to_string(frame) + ".exr";
-    if (frame == 0 || frame == 127)
+    if (frame <= 159)
     {
-        pTexture->captureToFile(0, 0, oss.str(), Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
-        //frame++;
+        pTexture->captureToFile(0, 0, oss.str(), Bitmap::FileFormat::PngFile, Bitmap::ExportFlags::None, true);
+        frame++;
     }
-    frame++;
+    //frame++;
     // renderData holds the requested resources
     // auto& pTexture = renderData.getTexture("src");
 }

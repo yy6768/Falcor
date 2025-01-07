@@ -283,6 +283,7 @@ void OptixDenoiser_::freeStagingBuffer(Interop& interop, OptixImage2D& image)
 
 void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
+    static int frame = 0;
     if (mEnabled )
     {
         if (mRecreateDenoiser)
@@ -308,25 +309,34 @@ void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& re
         {
             convertTexToBuf(pRenderContext, renderData.getTexture(kAlbedoInput), mDenoiser.interop.albedo.buffer, mBufferSize);
         }
-        if (mHasNormalInput && mDenoiser.options.guideNormal)
+        if (mHasNormalInput && mDenoiser.options.guideNormal && (frame<=159))
         {
             //std::cout << mDenoiser.options.guideNormal << "       ";
 
             mCamera = Camera::create("Custom Camera");
 
             // 读取相机参数
-            std::ifstream posFile("G:/data/frame0000/camera_position.txt");
+            std::ostringstream oss1;
+            oss1 << "G:/data/bistro1/frame" << std::setw(4) << std::setfill('0') << frame << "/"
+                 << "camera_position.txt";
+            std::ifstream posFile(oss1.str());
             float x, y, z;
             posFile >> x >> y >> z;
             float3 eyePosition = float3(x, y, z);
             posFile.close();
 
-            std::ifstream targetFile("G:/data/frame0000/camera_target.txt");
+            std::ostringstream oss2;
+            oss2 << "G:/data/bistro1/frame" << std::setw(4) << std::setfill('0') << frame << "/"
+                 << "camera_target.txt";
+            std::ifstream targetFile(oss2.str());
             targetFile >> x >> y >> z;
             float3 targetPosition = float3(x, y, z);
             targetFile.close();
 
-            std::ifstream upFile("G:/data/frame0000/camera_up.txt");
+            std::ostringstream oss3;
+            oss3 << "G:/data/bistro1/frame" << std::setw(4) << std::setfill('0') << frame << "/"
+                 << "camera_up.txt";
+            std::ifstream upFile(oss3.str());
             upFile >> x >> y >> z;
             float3 upVector = float3(x, y, z);
             upFile.close();
@@ -434,6 +444,7 @@ void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& re
     {
         pRenderContext->blit(renderData.getTexture(kColorInput)->getSRV(), renderData.getTexture(kOutput)->getRTV());
     }
+    frame++;
 }
 
 void OptixDenoiser_::renderUI(Gui::Widgets& widget)

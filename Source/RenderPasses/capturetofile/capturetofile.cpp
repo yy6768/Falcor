@@ -52,9 +52,9 @@ RenderPassReflection capturetofile::reflect(const CompileData& compileData)
     RenderPassReflection reflector;
     //reflector.addInput("input", "the source texture");
     //reflector.addInput("albedo", "albedo");
-    //reflector.addInput("color", "color");
+    reflector.addInput("color", "color");
     //reflector.addInput("depth", "depth");
-    reflector.addInput("normal", "normal");
+    //reflector.addInput("normal", "normal");
     //reflector.addInput("posw", "posw");
     //reflector.addInput("mov", "mov");
     
@@ -73,17 +73,20 @@ void capturetofile::execute(RenderContext* pRenderContext, const RenderData& ren
     {
         auto pTexture = renderData.getTexture(name);
         auto ext = Bitmap::getFileExtFromResourceFormat(pTexture->getFormat());
-        std::filesystem::path path = "G:/data/falcor/" + name + "/" + name + std::to_string(frame) + "." + ext;
+        //std::filesystem::path path = "G:/data/falcor/" + name + "/" + name + std::to_string(frame) + "." + ext;
+        std::ostringstream oss;
+        oss << "G:/data/color/frame" << std::setw(4) << std::setfill('0') << frame << ".exr";
         if (name != "albedo")
         {
-           pTexture->captureToFile(0, 0, path, Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
+           pTexture->captureToFile(0, 0, oss.str(), Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
         }
         else
         {
-            pTexture->captureToFile(0, 0, path, Bitmap::FileFormat::PngFile, Bitmap::ExportFlags::None, true);
+            pTexture->captureToFile(0, 0, oss.str(), Bitmap::FileFormat::ExrFile, Bitmap::ExportFlags::None, true);
         }
+        //std::cout << ext;
     };
-    auto save_camera = [&](std::string name)
+    /* auto save_camera = [&](std::string name)
     {
         std::filesystem::path path = "G:/data/falcor/" + name + "/" + name + std::to_string(frame) + ".txt";
         std::ofstream outFile(path);
@@ -113,14 +116,14 @@ void capturetofile::execute(RenderContext* pRenderContext, const RenderData& ren
 
             outFile.close();
         }
-    };
+    };*/
     //std::cout << pTextureb << "   "<<pTexturea  << std::endl;
-    if (frame==0 && mpScene)
+    if (frame<=159)
     {
         //save_gbuffer("albedo");
-        //save_gbuffer("color");
+        save_gbuffer("color");
         //save_gbuffer("depth");
-        save_gbuffer("normal");
+        //save_gbuffer("normal");
         //save_gbuffer("posw");
         //save_gbuffer("mov");
         //std::cout << "---------------    " << frame << "  ";

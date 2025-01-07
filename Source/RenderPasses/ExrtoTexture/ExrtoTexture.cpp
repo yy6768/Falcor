@@ -43,29 +43,6 @@ Properties ExrtoTexture::getProperties() const
 
 void ExrtoTexture::setScene(RenderContext* pRenderContext, const ref<Scene>& pScene)
 {
-    std::ifstream posFile("G:/data/frame0000/camera_position.txt");
-    float x, y, z;
-    posFile >> x >> y >> z;
-    float3 eyePosition = float3(x, y, z);
-    posFile.close();
-
-    // 读取目标位置
-    std::ifstream targetFile("G:/data/frame0000/camera_target.txt");
-    targetFile >> x >> y >> z;
-    float3 targetPosition = float3(x, y, z);
-    targetFile.close();
-
-    // 读取上向量
-    std::ifstream upFile("G:/data/frame0000/camera_up.txt");
-    upFile >> x >> y >> z;
-    float3 upVector = float3(x, y, z);
-    upFile.close();
-
-    // 设置Falcor相机
-    pScene->getCamera()->setPosition(eyePosition);
-    pScene->getCamera()->setTarget(targetPosition);
-    pScene->getCamera()->setUpVector(upVector);
-
     mpScene = pScene;
 }
 
@@ -73,10 +50,10 @@ RenderPassReflection ExrtoTexture::reflect(const CompileData& compileData)
 {
     // Define the required resources here
     RenderPassReflection reflector;
-    reflector.addOutput("color", "color");
-    reflector.addOutput("diffuse", "diffuse");
-    reflector.addOutput("motion", "motion");
-    reflector.addOutput("normal", "normal");
+    reflector.addOutput("color", "color").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput("diffuse", "diffuse").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput("motion", "motion").format(ResourceFormat::RGBA32Float);
+    reflector.addOutput("normal", "normal").format(ResourceFormat::RGBA32Float);
     // reflector.addInput("src");
     return reflector;
 }
@@ -88,19 +65,18 @@ void ExrtoTexture::execute(RenderContext* pRenderContext, const RenderData& rend
     const auto& pDstTexa = renderData.getTexture("diffuse");
     const auto& pDstTexm = renderData.getTexture("motion");
     const auto& pDstTexn = renderData.getTexture("normal");
+    //auto format = pDstTexc->getFormat();
     static int frame = 0;
+    //if (frame== 0) std::cout << to_string(format);
     auto loadtotexture = [&](std::string name) //将exr文件绑定到纹理接口
     {
         std::ostringstream oss;
-        //oss << "G:/data/bistro1png/" << name << "/frame" << std::setw(4) << std::setfill('0') << frame << ".png";
-        //std::filesystem::path path = oss.str(); // data为Falcor的同级文件夹
-        std::filesystem::path path;
-        if (name != "albedo")
-            path = "G:/data/frame0000/" + name + ".exr";
+        if (name != "color")
+            oss << "G:/data/bistro1/frame" << std::setw(4) << std::setfill('0') << frame << "/" << name << ".exr";
         else
-            path = "G:/data/frame0000/diffuse.exr";
-        //std::cout << "------------------------";
-        mpTex = Texture::createFromFile(mpDevice, path, false, true);
+            oss << "G:/data/bistro1_1spp/bistro1/frame" << std::setw(4) << std::setfill('0') << frame << "/" << name << ".exr";
+        std::filesystem::path path = oss.str(); // data为Falcor的同级文件夹
+        mpTex = Texture::createFromFile(mpDevice, path, false, false, ResourceBindFlags::ShaderResource, Bitmap::ImportFlags::None);
         /* if (!mpTex)
             std::cout << "Failed to load";
         else
@@ -108,8 +84,10 @@ void ExrtoTexture::execute(RenderContext* pRenderContext, const RenderData& rend
         if (name == "color")
         {
             pRenderContext->blit(mpTex->getSRV(), pDstTexc->getRTV());
+            /* auto format = pDstTexc->getFormat();
+            std::cout << to_string(format);*/
         }
-        else if (name == "albedo")
+        else if (name == "diffuse")
         {
             pRenderContext->blit(mpTex->getSRV(), pDstTexa->getRTV());
         }
@@ -122,10 +100,11 @@ void ExrtoTexture::execute(RenderContext* pRenderContext, const RenderData& rend
             pRenderContext->blit(mpTex->getSRV(), pDstTexn->getRTV());
         }
     };
-    if (frame==0)
+    if (frame<=159)
     {
+        std::cout << "....";
         loadtotexture("color");
-        loadtotexture("albedo");
+        loadtotexture("diffuse");
         loadtotexture("motion");
         loadtotexture("normal");
         frame++;

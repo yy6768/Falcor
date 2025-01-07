@@ -4,5 +4,8 @@
 
 ##使用OptixDenoiser
 
-我们的任务要求是导入已有的纹理exr文件，具体实现放在Falcor/Source/RenderPasses/ExrtoTexture中。降噪后的结果保存实现放在Falcor/Source/RenderPasses/OptixDenoiserReference中。测试脚本为Falcor/Scripts/test_Optix.py。同时，由于直接导入纹理不会构建场景，OptixDenoiser Pass不会使用其他纹理辅助降噪，所以将其中的条件判断（mpScene）删除。此外，normal的知道要求获取场景中相机的view矩阵，在没有场景的情况下，直接利用数据集中的相机参数构建view矩阵即可。
+我们的任务要求是导入已有的纹理exr文件，具体实现放在Falcor/Source/RenderPasses/ExrtoTexture中。降噪后的结果保存实现放在Falcor/Source/RenderPasses/OptixDenoiserReference中。测试脚本为Falcor/Scripts/OptixDenoiser.py。同时，由于直接导入纹理不会构建场景，OptixDenoiser Pass不会使用其他纹理辅助降噪，所以将其中的条件判断（mpScene）删除。此外，normal的知道要求获取场景中相机的view矩阵，在没有场景的情况下，直接利用数据集中的相机参数构建view矩阵即可。
 
+##capturetofile
+
+提取使用的capturetofile函数在debug时改了许多，请忽略它。
