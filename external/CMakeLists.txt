@@ -491,6 +491,7 @@ endif()
 # optix
 set(OPTIX_DIR ${PACKMAN_DIR}/optix)
 if(EXISTS ${OPTIX_DIR}/include/optix.h)
+    message(STATUS "optix found")
     add_library(optix INTERFACE)
     target_include_directories(optix INTERFACE ${OPTIX_DIR}/include)
     set(FALCOR_HAS_OPTIX ON PARENT_SCOPE)

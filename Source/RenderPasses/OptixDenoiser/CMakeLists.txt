@@ -19,4 +19,9 @@ target_copy_shaders(OptixDenoiser RenderPasses/OptixDenoiser)
 
 target_link_libraries(OptixDenoiser PRIVATE optix)
 
+# 确保OptiX函数表可用
+target_compile_definitions(OptixDenoiser PRIVATE
+    OPTIX_FUNCTION_TABLE_VERSION=93
+)
+
 target_source_group(OptixDenoiser "RenderPasses")

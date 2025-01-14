@@ -71,7 +71,7 @@ void OptixDenoiserApp::setupRenderGraph()
     mpGraph->addPass(pOptixDenoiser, "OptixDenoiser");
 
     // Connect passes
-    mpGraph->addEdge("ColorLoader.dst", "OptixDenoiser.src");
+    mpGraph->addEdge("ColorLoader.dst", "OptixDenoiser.color");
     mpGraph->addEdge("AlbedoLoader.dst", "OptixDenoiser.albedo");
     mpGraph->addEdge("NormalLoader.dst", "OptixDenoiser.normal");
     mpGraph->addEdge("MotionLoader.dst", "OptixDenoiser.mvec");
@@ -82,7 +82,7 @@ void OptixDenoiserApp::setupRenderGraph()
     props["blend"] = mConfig.blendFactor;
 
     // Mark output
-    mpGraph->markOutput("OptixDenoiser.dst");
+    mpGraph->markOutput("OptixDenoiser.output");
 }
 
 void OptixDenoiserApp::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
@@ -281,7 +281,7 @@ void OptixDenoiserApp::onHotReload(HotReloadFlags reloaded)
 int runMain(int argc, char** argv)
 {
     SampleAppConfig config;
-    config.windowDesc.title = "Falcor Project Template";
+    config.windowDesc.title = "Optix Denoiser App";
     config.windowDesc.resizableWindow = true;
 
     OptixDenoiserApp project(config);
@@ -290,5 +290,9 @@ int runMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    return catchAndReportAllExceptions([&]() { return runMain(argc, argv); });
+    return catchAndReportAllExceptions([&]()
+    {
+        return runMain(argc, argv);
+    });
+
 }
