@@ -101,6 +101,37 @@ Properties ImageLoader::getProperties() const
     return props;
 }
 
+void ImageLoader::setProperties(const Properties& props)
+{
+    for (const auto& [key, value] : props)
+    {
+        if (key == kOutputSize)
+            mOutputSizeSelection = value;
+        else if (key == kOutputFormat)
+            mOutputFormat = value;
+        else if (key == kImage)
+            mImagePath = value.operator std::filesystem::path();
+        else if (key == kSrgb)
+            mLoadSRGB = value;
+        else if (key == kMips)
+            mGenerateMips = value;
+        else if (key == kArraySlice)
+            mArraySlice = value;
+        else if (key == kMipLevel)
+            mMipLevel = value;
+        else
+            logWarning("Unknown property '{}' in a ImageLoader properties.", key);
+    }
+
+    if (!mImagePath.empty())
+    {
+        if (!loadImage(mImagePath))
+        {
+            FALCOR_THROW("ImageLoader: Failed to load image from '{}'", mImagePath);
+        }
+    }
+}
+
 void ImageLoader::compile(RenderContext* pRenderContext, const CompileData& compileData)
 {
     FALCOR_CHECK(mpTex, "ImageLoader: No image loaded");
@@ -192,6 +223,7 @@ bool ImageLoader::loadImage(const std::filesystem::path& path)
     {
         mImagePath = path;
         mpTex = Texture::createFromFile(mpDevice, resolvedPath, mGenerateMips, mLoadSRGB);
+        logInfo("Loaded Image '{}'", mImagePath.string());
         return mpTex != nullptr;
     }
     else

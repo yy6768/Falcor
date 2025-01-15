@@ -46,6 +46,7 @@ public:
     virtual void execute(RenderContext* pRenderContext, const RenderData& renderData) override;
     virtual void renderUI(Gui::Widgets& widget) override;
     virtual Properties getProperties() const override;
+    virtual void setProperties(const Properties& props) override;
 
 private:
     bool loadImage(const std::filesystem::path& path);

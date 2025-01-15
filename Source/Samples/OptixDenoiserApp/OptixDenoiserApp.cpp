@@ -54,20 +54,42 @@ void OptixDenoiserApp::setupRenderGraph()
     mpGraph = RenderGraph::create(pDevice, "OptixDenoiser");
 
     // ColorLoader pass
-    auto pColorLoader = RenderPass::create("ImageLoader", pDevice, {});
+    Properties colorProps;
+    colorProps["mips"] = true;
+    colorProps["srgb"] = false;
+    colorProps["outputFormat"] = "RGBA32Float";
+    auto pColorLoader = RenderPass::create("ImageLoader", pDevice, colorProps);
     mpGraph->addPass(pColorLoader, "ColorLoader");
+
     // AlbedoLoader pass
-    auto pAlbedoLoader = RenderPass::create("ImageLoader", pDevice, {});
+    Properties albedoProps;
+    albedoProps["mips"] = true;
+    albedoProps["srgb"] = false;
+    albedoProps["outputFormat"] = "RGBA32Float";
+    auto pAlbedoLoader = RenderPass::create("ImageLoader", pDevice, albedoProps);
     mpGraph->addPass(pAlbedoLoader, "AlbedoLoader");
+
     // NormalLoader pass
-    auto pNormalLoader = RenderPass::create("ImageLoader", pDevice, {});
+    Properties normalProps;
+    normalProps["mips"] = true;
+    normalProps["srgb"] = false;
+    normalProps["outputFormat"] = "RGBA32Float";
+    auto pNormalLoader = RenderPass::create("ImageLoader", pDevice, normalProps);
     mpGraph->addPass(pNormalLoader, "NormalLoader");
+
     // MotionLoader pass
-    auto pMotionLoader = RenderPass::create("ImageLoader", pDevice, {});
+    Properties motionProps;
+    motionProps["mips"] = true;
+    motionProps["srgb"] = false;
+    motionProps["outputFormat"] = "RGBA32Float";
+    auto pMotionLoader = RenderPass::create("ImageLoader", pDevice, motionProps);
     mpGraph->addPass(pMotionLoader, "MotionLoader");
 
     // OptixDenoiser pass
-    auto pOptixDenoiser = RenderPass::create("OptixDenoiser", pDevice, {});
+    Properties denoiserProps;
+    denoiserProps["denoiseAlpha"] = mConfig.denoiseAlpha;
+    denoiserProps["blend"] = mConfig.blendFactor;
+    auto pOptixDenoiser = RenderPass::create("OptixDenoiser", pDevice, denoiserProps);
     mpGraph->addPass(pOptixDenoiser, "OptixDenoiser");
 
     // Connect passes
@@ -76,13 +98,9 @@ void OptixDenoiserApp::setupRenderGraph()
     mpGraph->addEdge("NormalLoader.dst", "OptixDenoiser.normal");
     mpGraph->addEdge("MotionLoader.dst", "OptixDenoiser.mvec");
 
-    // Set parameters
-    auto props = pOptixDenoiser->getProperties();
-    props["denoiseAlpha"] = mConfig.denoiseAlpha;
-    props["blend"] = mConfig.blendFactor;
-
     // Mark output
     mpGraph->markOutput("OptixDenoiser.output");
+
 }
 
 void OptixDenoiserApp::onFrameRender(RenderContext* pRenderContext, const ref<Fbo>& pTargetFbo)
@@ -149,51 +167,85 @@ void OptixDenoiserApp::onGuiRender(Gui* pGui)
     }
 }
 
-void OptixDenoiserApp::processImage(const std::filesystem::path& inputPath)
+void OptixDenoiserApp::processImage(const std::filesystem::path& framePath)
 {
     try
     {
-        mConfig.currentFile = inputPath.filename().string();
+        mConfig.currentFile = framePath.filename().string();
 
         // 构建相关文件路径
-        std::string colorPath = inputPath.string();
-        std::string albedoPath = inputPath.parent_path().string() + "/" +
-                                inputPath.stem().string() + "_albedo.exr";
-        std::string normalPath = inputPath.parent_path().string() + "/" +
-                                inputPath.stem().string() + "_normal.exr";
-        std::string motionPath = inputPath.parent_path().string() + "/" +
-                                inputPath.stem().string() + "_motion.exr";
+        std::string colorPath = (framePath / "color.exr").string();
+        std::string albedoPath = (framePath / "albedo.exr").string();
+        std::string normalPath = (framePath / "normal.exr").string();
+        std::string motionPath = (framePath / "motion.exr").string();
+
+        // 首先加载颜色图像以获取尺寸
+        auto pColorImage = Bitmap::createFromFile(colorPath, true);
+        if (!pColorImage)
+        {
+            throw std::runtime_error("Failed to load color image: " + colorPath);
+        }
+
+        uint2 imageSize = uint2(pColorImage->getWidth(), pColorImage->getHeight());
+        if (imageSize.x == 0 || imageSize.y == 0)
+        {
+            throw std::runtime_error("Invalid image dimensions");
+        }
+
+        // 创建一个临时的 FBO 来设置正确的尺寸
+        ref<Fbo> pResizeFbo = Fbo::create(getDevice());
+        ref<Texture> pResizeTex = getDevice()->createTexture2D(
+            imageSize.x, imageSize.y,
+            ResourceFormat::RGBA32Float,
+            1, 1, nullptr,
+            ResourceBindFlags::RenderTarget
+        );
+        pResizeFbo->attachColorTarget(pResizeTex, 0);
+
+        // 通过 onResize 更新渲染图尺寸
+        mpGraph->onResize(pResizeFbo.get());
 
         // 设置输入路径
         auto pColorLoader = mpGraph->getPass("ColorLoader");
-        pColorLoader->setProperties({
-            {"colorPath", colorPath},
-        });
-        auto pAlbedoLoader = mpGraph->getPass("AlbedoLoader");
-        pAlbedoLoader->setProperties({
-            {"albedoPath", albedoPath},
-        });
-        auto pNormalLoader = mpGraph->getPass("NormalLoader");
-        pNormalLoader->setProperties({
-            {"normalPath", normalPath},
-        });
-        auto pMotionLoader = mpGraph->getPass("MotionLoader");
-        pMotionLoader->setProperties({
-            {"motionPath", motionPath},
-        });
+        Properties colorProps;
+        colorProps["filename"] = colorPath;
+        colorProps["mips"] = true;
+        colorProps["srgb"] = false;
+        pColorLoader->setProperties(colorProps);
 
-        // Execute denoising
-        auto pRenderContext = getRenderContext();
-        mpGraph->execute(pRenderContext);
+        auto pAlbedoLoader = mpGraph->getPass("AlbedoLoader");
+        Properties albedoProps;
+        albedoProps["filename"] = albedoPath;
+        albedoProps["mips"] = true;
+        albedoProps["srgb"] = false;
+        pAlbedoLoader->setProperties(albedoProps);
+
+        auto pNormalLoader = mpGraph->getPass("NormalLoader");
+        Properties normalProps;
+        normalProps["filename"] = normalPath;
+        normalProps["mips"] = true;
+        normalProps["srgb"] = false;
+        pNormalLoader->setProperties(normalProps);
+
+        auto pMotionLoader = mpGraph->getPass("MotionLoader");
+        Properties motionProps;
+        motionProps["filename"] = motionPath;
+        motionProps["mips"] = true;
+        motionProps["srgb"] = false;
+        pMotionLoader->setProperties(motionProps);
+
+        // 编译和执行渲染图
+        mpGraph->compile(getRenderContext());
+        mpGraph->execute(getRenderContext());
 
         // Get output
-        ref<Texture> pOutputTex = mpGraph->getOutput("OptixDenoiser.dst")->asTexture();
+        ref<Texture> pOutputTex = mpGraph->getOutput("OptixDenoiser.output")->asTexture();
         mConfig.pOutputPreview = pOutputTex;
 
         // Build output path
-        std::filesystem::path outputPath = mConfig.outputDir / inputPath.filename();
-        outputPath.replace_extension(".denoised.exr");
-
+        std::filesystem::path outputPath = mConfig.outputDir / (framePath.filename().string() + ".exr");
+        // Create output directory if it doesn't exist
+        std::filesystem::create_directories(mConfig.outputDir);
         // Save result
         pOutputTex->captureToFile(0, 0, outputPath.string());
 
@@ -201,7 +253,7 @@ void OptixDenoiserApp::processImage(const std::filesystem::path& inputPath)
     }
     catch(const std::exception& e)
     {
-        logError("Error processing image {}: {}", inputPath.string(), e.what());
+        logError("Error processing frame {}: {}", framePath.string(), e.what());
     }
 }
 
@@ -209,25 +261,30 @@ void OptixDenoiserApp::processDirectory()
 {
     try
     {
-        // 计算总文件数
         mConfig.totalCount = 0;
         mConfig.processedCount = 0;
         mConfig.processing = true;
 
+        // 遍历input目录下的所有子文件夹
         for(auto& p: std::filesystem::directory_iterator(mConfig.inputDir))
         {
-            if(p.path().extension() == ".exr")
+            if(std::filesystem::is_directory(p) &&
+               std::filesystem::exists(p.path() / "color.exr"))
             {
                 mConfig.totalCount++;
             }
         }
 
-        // 处理文件
+        // 按帧处理
         for(auto& p: std::filesystem::directory_iterator(mConfig.inputDir))
         {
-            if(p.path().extension() == ".exr")
+            if(std::filesystem::is_directory(p))
             {
-                processImage(p.path());
+                auto framePath = p.path();
+                // 检查必要的文件是否都存在
+                if(std::filesystem::exists(framePath / "color.exr"))
+                {processImage(framePath);
+                }
             }
         }
 

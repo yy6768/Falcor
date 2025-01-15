@@ -29,6 +29,7 @@
 #include "Falcor.h"
 #include "Core/SampleApp.h"
 #include "RenderGraph/RenderGraph.h"
+#include "RenderGraph/RenderPassHelpers.h"
 
 using namespace Falcor;
 
@@ -60,12 +61,15 @@ private:
     ref<RenderGraph> mpGraph;
 
     struct {
-        std::filesystem::path inputDir = "input";     // 输入目录
-        std::filesystem::path outputDir = "output";   // 输出目录
+        std::filesystem::path inputDir = "G:\\optix\\input";     // 输入目录
+        std::filesystem::path outputDir = "G:\\optix\\output";   // 输出目录
         std::string filePattern = "*.exr";           // 文件匹配模式
         bool processing = false;                     // 当前是否正在处理
         uint32_t processedCount = 0;                // 已处理图像数量
         uint32_t totalCount = 0;                    // 总图像数量
+
+        // RenderPassHelpers::IOSize resolution{ 1080, 1920 };        // 输出尺寸
+
 
         // 预览相关
         ref<Texture> pInputPreview;                 // 输入图像预览
@@ -74,6 +78,6 @@ private:
 
         // Optix参数
         bool denoiseAlpha = false;                  // 是否降噪Alpha通道
-        float blendFactor = 0.0f;                   // 混合因子(0=降噪,1=原图)
+        float blendFactor = 0.0f;                   // Blend factor(0=降噪,1=原图)
     } mConfig;
 };

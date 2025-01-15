@@ -1062,26 +1062,26 @@ if(FALCOR_LINUX)
     file(GENERATE OUTPUT ${FALCOR_OUTPUT_DIRECTORY}/setpath.sh INPUT ${CMAKE_SOURCE_DIR}/build_scripts/setpath.sh.in)
 endif()
 
-# Find TensorRT
-# 在find_package(TensorRT)之前添加
-set(TENSORRT_ROOT "${CMAKE_SOURCE_DIR}/external/packman/TensorRT")
-set(TENSORRT_INCLUDE_DIR "${TENSORRT_ROOT}/include")
-set(TENSORRT_LIBRARY "${TENSORRT_ROOT}/lib/nvinfer_10.lib")
-set(TENSORRT_PARSER_LIBRARY "${TENSORRT_ROOT}/lib/nvonnxparser_10.lib")
+# # Find TensorRT
+# # 在find_package(TensorRT)之前添加
+# set(TENSORRT_ROOT "${CMAKE_SOURCE_DIR}/external/packman/TensorRT")
+# set(TENSORRT_INCLUDE_DIR "${TENSORRT_ROOT}/include")
+# set(TENSORRT_LIBRARY "${TENSORRT_ROOT}/lib/nvinfer_10.lib")
+# set(TENSORRT_PARSER_LIBRARY "${TENSORRT_ROOT}/lib/nvonnxparser_10.lib")
 
-# 打印路径以便调试
+# # 打印路径以便调试
 
-# Find TensorRT
-find_package(TensorRT REQUIRED)
+# # Find TensorRT
+# find_package(TensorRT REQUIRED)
 
-target_link_libraries(Falcor
-    PRIVATE
-    ${TENSORRT_LIBRARIES}
-    nvinfer
-    nvonnxparser
-)
+# target_link_libraries(Falcor
+#     PRIVATE
+#     ${TENSORRT_LIBRARIES}
+#     nvinfer
+#     nvonnxparser
+# )
 
-target_include_directories(Falcor
-    PRIVATE
-    ${TENSORRT_INCLUDE_DIRS}
-)
+# target_include_directories(Falcor
+#     PRIVATE
+#     ${TENSORRT_INCLUDE_DIRS}
+# )
