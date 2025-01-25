@@ -1,5 +1,5 @@
 /***************************************************************************
- # Copyright (c) 2015-23, NVIDIA CORPORATION. All rights reserved.
+ # Copyright (c) 2015-24, NVIDIA CORPORATION. All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without
  # modification, are permitted provided that the following conditions
@@ -86,10 +86,7 @@ OptixDenoiser_::OptixDenoiser_(ref<Device> pDevice, const Properties& props) : R
         else if (key == kBlend)
             mDenoiser.params.blendFactor = value;
         else if (key == kDenoiseAlpha)
-            mDenoiser.options.denoiseAlpha =
-                (value ?
-                    OptixDenoiserAlphaMode::OPTIX_DENOISER_ALPHA_MODE_DENOISE :
-                    OptixDenoiserAlphaMode::OPTIX_DENOISER_ALPHA_MODE_COPY);
+            mDenoiser.params.denoiseAlpha = (value ? 1u : 0u);
         else
             logWarning("Unknown property '{}' in a OptixDenoiser properties.", key);
     }
@@ -108,7 +105,7 @@ Properties OptixDenoiser_::getProperties() const
     props[kEnabled] = mEnabled;
     props[kBlend] = mDenoiser.params.blendFactor;
     props[kModel] = mDenoiser.modelKind;
-    props[kDenoiseAlpha] = bool(mDenoiser.options.denoiseAlpha > 0);
+    props[kDenoiseAlpha] = bool(mDenoiser.params.denoiseAlpha > 0);
 
     return props;
 }
@@ -283,7 +280,8 @@ void OptixDenoiser_::freeStagingBuffer(Interop& interop, OptixImage2D& image)
 
 void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
-    if (mEnabled && mpScene)
+    // if (mEnabled && mpScene)
+    if (mEnabled)
     {
         if (mRecreateDenoiser)
         {
@@ -310,13 +308,14 @@ void OptixDenoiser_::execute(RenderContext* pRenderContext, const RenderData& re
         }
         if (mHasNormalInput && mDenoiser.options.guideNormal)
         {
-            convertNormalsToBuf(
-                pRenderContext,
-                renderData.getTexture(kNormalInput),
-                mDenoiser.interop.normal.buffer,
-                mBufferSize,
-                transpose(inverse(mpScene->getCamera()->getViewMatrix()))
-            );
+            // convertNormalsToBuf(
+            //     pRenderContext,
+            //     renderData.getTexture(kNormalInput),
+            //     mDenoiser.interop.normal.buffer,
+            //     mBufferSize,
+            //     transpose(inverse(mpScene->getCamera()->getViewMatrix()))
+            // );
+            convertTexToBuf(pRenderContext, renderData.getTexture(kNormalInput), mDenoiser.interop.normal.buffer, mBufferSize);
         }
         if (mHasMotionInput && mDenoiser.modelKind == OptixDenoiserModelKind::OPTIX_DENOISER_MODEL_KIND_TEMPORAL)
         {
@@ -442,12 +441,10 @@ void OptixDenoiser_::renderUI(Gui::Widgets& widget)
         }
 
         {
-            bool denoiseAlpha = mDenoiser.options.denoiseAlpha == OptixDenoiserAlphaMode::OPTIX_DENOISER_ALPHA_MODE_DENOISE;
+            bool denoiseAlpha = mDenoiser.params.denoiseAlpha != 0;
             if (widget.checkbox("Denoise Alpha?", denoiseAlpha))
             {
-                mDenoiser.options.denoiseAlpha = (denoiseAlpha ?
-                    OptixDenoiserAlphaMode::OPTIX_DENOISER_ALPHA_MODE_DENOISE :
-                    OptixDenoiserAlphaMode::OPTIX_DENOISER_ALPHA_MODE_COPY);
+                mDenoiser.params.denoiseAlpha = denoiseAlpha ? 1u : 0u;
             }
             widget.tooltip("Denoise the alpha channel, not just RGB.");
         }
@@ -463,9 +460,7 @@ void* OptixDenoiser_::exportBufferToCudaDevice(ref<Buffer>& buf)
 {
     if (buf == nullptr)
         return nullptr;
-    return cuda_utils::getSharedDevicePtr(buf->getDevice()->getType(),
-                                         buf->getSharedApiHandle(),
-                                         (uint32_t)buf->getSize());
+    return cuda_utils::getSharedDevicePtr(buf->getDevice()->getType(), buf->getSharedApiHandle(), (uint32_t)buf->getSize());
 }
 
 void OptixDenoiser_::setupDenoiser()
