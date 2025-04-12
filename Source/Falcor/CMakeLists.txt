@@ -795,10 +795,17 @@ if(FALCOR_HAS_CUDA)
     )
 endif()
 
+# TensorRT
+target_sources(Falcor PRIVATE
+    Utils/TensorRT/TensorRTInference.cpp
+    Utils/TensorRT/TensorRTInference.h
+)
+
 target_source_group(Falcor "/")
 
 # ImGui source files
 # Note: These added after calling target_source_group macro as they are outside the current folder.
+
 target_sources(Falcor PRIVATE
     ../../external/imgui/imconfig.h
     ../../external/imgui/imgui.h
@@ -983,6 +990,8 @@ target_link_libraries(Falcor
         nanovdb
         external_includes
         rtxdi
+        # TensorRT
+        $<$<BOOL:${FALCOR_ENABLE_TENSORRT}>:tensorrt>
         $<$<BOOL:${FALCOR_HAS_CUDA}>:CUDA::cuda_driver>
         $<$<BOOL:${FALCOR_HAS_CUDA}>:CUDA::cudart_static>
     PRIVATE
@@ -1062,26 +1071,8 @@ if(FALCOR_LINUX)
     file(GENERATE OUTPUT ${FALCOR_OUTPUT_DIRECTORY}/setpath.sh INPUT ${CMAKE_SOURCE_DIR}/build_scripts/setpath.sh.in)
 endif()
 
-# Find TensorRT
-# 在find_package(TensorRT)之前添加
-set(TENSORRT_ROOT "${CMAKE_SOURCE_DIR}/external/packman/TensorRT")
-set(TENSORRT_INCLUDE_DIR "${TENSORRT_ROOT}/include")
-set(TENSORRT_LIBRARY "${TENSORRT_ROOT}/lib/nvinfer_10.lib")
-set(TENSORRT_PARSER_LIBRARY "${TENSORRT_ROOT}/lib/nvonnxparser_10.lib")
 
-# 打印路径以便调试
 
-# Find TensorRT
-find_package(TensorRT REQUIRED)
 
-target_link_libraries(Falcor
-    PRIVATE
-    ${TENSORRT_LIBRARIES}
-    nvinfer
-    nvonnxparser
-)
 
-target_include_directories(Falcor
-    PRIVATE
-    ${TENSORRT_INCLUDE_DIRS}
-)
+

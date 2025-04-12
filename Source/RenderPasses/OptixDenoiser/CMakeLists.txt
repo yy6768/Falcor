@@ -1,3 +1,4 @@
+return()
 if(NOT (FALCOR_HAS_CUDA AND FALCOR_HAS_OPTIX))
     return()
 endif()

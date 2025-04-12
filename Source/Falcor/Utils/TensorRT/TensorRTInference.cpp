@@ -1,119 +1,107 @@
 #include "TensorRTInference.h"
-#include "NvOnnxParser.h"
+#include "Utils/Logger.h"
 #include <fstream>
+#include <numeric>
 
 namespace Falcor {
 
-void Logger::log(Severity severity, const char* msg) noexcept {
+void TRTLogger::log(nvinfer1::ILogger::Severity severity, const nvinfer1::AsciiChar* msg) noexcept {
     // Map TensorRT severity to Falcor logging
     switch (severity) {
-        case Severity::kINTERNAL_ERROR:
-        case Severity::kERROR:
-            FALCOR_ERROR("TensorRT: {}", msg);
+        case nvinfer1::ILogger::Severity::kINTERNAL_ERROR:
+        case nvinfer1::ILogger::Severity::kERROR:
+            logError("TensorRT: {}", msg);
             break;
-        case Severity::kWARNING:
-            FALCOR_WARN("TensorRT: {}", msg);
+        case nvinfer1::ILogger::Severity::kWARNING:
+            logWarning("TensorRT: {}", msg);
             break;
-        case Severity::kINFO:
-            FALCOR_INFO("TensorRT: {}", msg);
+        case nvinfer1::ILogger::Severity::kINFO:
+            logInfo("TensorRT: {}", msg);
             break;
         default:
             break;
     }
 }
 
-TensorRTInference::TensorRTInference() {
-    cudaStreamCreate(&mCudaStream);
+TensorRTInference::TensorRTInference(bool enableFP16) : mEnableFP16(enableFP16) {
+    cudaStreamCreate(&mStream);
 }
 
 TensorRTInference::~TensorRTInference() {
-    if (mContext) mContext->destroy();
-    if (mEngine) mEngine->destroy();
-    if (mRuntime) mRuntime->destroy();
-    
-    for (void* buffer : mCudaBuffers) {
+    cudaStreamDestroy(mStream);
+    for (auto& buffer : mDeviceBuffers) {
         if (buffer) cudaFree(buffer);
     }
-    
-    if (mCudaStream) cudaStreamDestroy(mCudaStream);
 }
 
-bool TensorRTInference::initializeFromONNX(const std::string& onnxPath) {
-    // Create builder
-    auto builder = std::unique_ptr<nvinfer1::IBuilder>(
-        nvinfer1::createInferBuilder(mLogger));
+bool TensorRTInference::buildEngineFromONNX(const std::string& onnxPath) {
+    auto builder = std::unique_ptr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(mLogger));
     if (!builder) return false;
 
-    // Create network
-    const auto explicitBatch = 1U << static_cast<uint32_t>(
-        nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
-    auto network = std::unique_ptr<nvinfer1::INetworkDefinition>(
-        builder->createNetworkV2(explicitBatch));
-    if (!network) return false;
+    const auto explicitBatch = 1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
+    auto network = std::unique_ptr<nvinfer1::INetworkDefinition>(builder->createNetworkV2(explicitBatch));
+    auto config = std::unique_ptr<nvinfer1::IBuilderConfig>(builder->createBuilderConfig());
+    auto parser = std::unique_ptr<nvonnxparser::IParser>(nvonnxparser::createParser(*network, mLogger));
 
-    // Create ONNX parser
-    auto parser = std::unique_ptr<nvonnxparser::IParser>(
-        nvonnxparser::createParser(*network, mLogger));
-    if (!parser) return false;
-
-    // Parse ONNX file
-    if (!parser->parseFromFile(onnxPath.c_str(), 
-        static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
+    if (!parser->parseFromFile(onnxPath.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
         return false;
     }
 
-    // Create inference engine
-    auto config = std::unique_ptr<nvinfer1::IBuilderConfig>(
-        builder->createBuilderConfig());
-    if (!config) return false;
+    // 现代配置方式
+    // config->setMaxWorkspaceSize(1 << 30);
+    if (mEnableFP16) config->setFlag(nvinfer1::BuilderFlag::kFP16);
 
-    // Build serialized engine
-    auto engineData = std::unique_ptr<nvinfer1::IHostMemory>(
-        builder->buildSerializedNetwork(*network, *config));
-    if (!engineData) return false;
+    // 处理动态形状
+    auto profile = builder->createOptimizationProfile();
+    auto input = network->getInput(0);
+    auto inputDims = input->getDimensions();
 
-    // Create runtime and engine
-    mRuntime = nvinfer1::createInferRuntime(mLogger);
-    if (!mRuntime) return false;
+    profile->setDimensions(input->getName(),
+        nvinfer1::OptProfileSelector::kMIN, inputDims);
+    profile->setDimensions(input->getName(),
+        nvinfer1::OptProfileSelector::kOPT, inputDims);
+    profile->setDimensions(input->getName(),
+        nvinfer1::OptProfileSelector::kMAX, inputDims);
 
-    mEngine = mRuntime->deserializeCudaEngine(
-        engineData->data(), engineData->size());
+    config->addOptimizationProfile(profile);
+
+    mEngine = std::unique_ptr<nvinfer1::ICudaEngine>(
+        builder->buildEngineWithConfig(*network, *config)
+    );
+
     if (!mEngine) return false;
 
-    // Create execution context
-    mContext = mEngine->createExecutionContext();
+    mContext = std::unique_ptr<nvinfer1::IExecutionContext>(mEngine->createExecutionContext());
     if (!mContext) return false;
 
-    // Get dimensions and allocate buffers
-    mInputDims = mEngine->getBindingDimensions(0);
-    mOutputDims = mEngine->getBindingDimensions(1);
+    // 设置绑定维度
+    // mInputDims = mEngine->getBindingDimensions(0);
+    // mOutputDims = mEngine->getBindingDimensions(1);
 
-    size_t inputSize = volume(mInputDims) * sizeof(float);
-    size_t outputSize = volume(mOutputDims) * sizeof(float);
+    // 分配设备内存
+    const auto inputSize = std::accumulate(mInputDims.d, mInputDims.d + mInputDims.nbDims, 1, std::multiplies<>());
+    const auto outputSize = std::accumulate(mOutputDims.d, mOutputDims.d + mOutputDims.nbDims, 1, std::multiplies<>());
 
-    cudaMalloc(&mCudaBuffers[0], inputSize);
-    cudaMalloc(&mCudaBuffers[1], outputSize);
+    cudaMalloc(&mDeviceBuffers[0], inputSize * sizeof(float));
+    cudaMalloc(&mDeviceBuffers[1], outputSize * sizeof(float));
 
     return true;
 }
 
-bool TensorRTInference::infer(const float* input, float* output) {
-    // Copy input to GPU
-    size_t inputSize = volume(mInputDims) * sizeof(float);
-    cudaMemcpyAsync(mCudaBuffers[0], input, inputSize, 
-        cudaMemcpyHostToDevice, mCudaStream);
+bool TensorRTInference::execute(const std::vector<float>& input, std::vector<float>& output) {
+    const auto inputSize = input.size() * sizeof(float);
+    const auto outputSize = output.size() * sizeof(float);
 
-    // Execute inference
-    if (!mContext->enqueueV2(mCudaBuffers, mCudaStream, nullptr))
+    cudaMemcpyAsync(mDeviceBuffers[0], input.data(), inputSize, cudaMemcpyHostToDevice, mStream);
+
+    if (!mContext->executeV2(mDeviceBuffers)) {
         return false;
+    }
 
-    // Copy output back to CPU
-    size_t outputSize = volume(mOutputDims) * sizeof(float);
-    cudaMemcpyAsync(output, mCudaBuffers[1], outputSize,
-        cudaMemcpyDeviceToHost, mCudaStream);
+    cudaMemcpyAsync(output.data(), mDeviceBuffers[1], outputSize, cudaMemcpyDeviceToHost, mStream);
+    cudaStreamSynchronize(mStream);
 
-    cudaStreamSynchronize(mCudaStream);
     return true;
 }
 
-} // namespace Falcor 
+} // namespace Falcor

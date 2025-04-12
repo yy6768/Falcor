@@ -28,6 +28,7 @@
 #pragma once
 #include "Falcor.h"
 #include "RenderGraph/RenderPass.h"
+#include "Utils/TensorRT/TensorRTInference.h"
 // #include "Utils/TensorRT/TensorRTDenoiser.h"
 
 using namespace Falcor;
@@ -51,9 +52,34 @@ public:
     virtual void renderUI(Gui::Widgets& widget) override;
 
 private:
-    // std::unique_ptr<TensorRTDenoiser> mpDenoiser;
+    std::unique_ptr<TensorRTInference> mpDenoiser;
 
-    // UI变量
+    // Input/Output textures
+    ref<Texture> mpInputColor;
+    ref<Texture> mpOutputColor;
+
+    // Staging buffers for GPU<->CPU transfer
+    std::vector<float> mInputBuffer;
+    std::vector<float> mOutputBuffer;
+
+    // Compute shader for Splat operation
+    ComputeProgram::SharedPtr mpSplatProgram;
+    ComputeVars::SharedPtr mpSplatVars;
+
+    // Temporary textures for Splat operation
+    ref<Texture> mpKernelTexture;
+    ref<Texture> mpTempTexture;
+
+    // UI variables
     std::string mModelPath = "model.onnx";
     bool mEnableDenoising = true;
+
+    // Internal methods
+    bool initDenoiser();
+    void processImage(RenderContext* pRenderContext, const RenderData& renderData);
+
+    // Splat operation implementation (similar to PyTorch implementation in ReadMe)
+    void splatOperation(RenderContext* pRenderContext, const Texture::SharedPtr& input,
+                        const Texture::SharedPtr& kernel, const Texture::SharedPtr& output,
+                        uint32_t kernelSize);
 };

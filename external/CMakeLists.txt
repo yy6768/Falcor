@@ -530,3 +530,34 @@ endif()
 set(RTXDI_DIR ${PACKMAN_DIR}/rtxdi)
 add_library(rtxdi INTERFACE)
 target_include_directories(rtxdi INTERFACE ${RTXDI_DIR}/rtxdi-sdk/include)
+
+
+# tensorrt
+include(${CMAKE_MODULE_PATH}/FindTensorRT.cmake)
+if(TENSORRT_FOUND)
+    message(STATUS "Found TensorRT at: ${TENSORRT_INCLUDE_DIR}")
+
+    add_library(tensorrt INTERFACE)
+    target_include_directories(tensorrt INTERFACE
+        ${TENSORRT_INCLUDE_DIR}
+        ${TENSORRT_INCLUDE_DIR}/../samples/common
+    )
+    if(FALCOR_WINDOWS)
+        target_link_libraries(tensorrt INTERFACE
+            ${TENSORRT_LIBRARY}
+            ${TENSORRT_PARSER_LIBRARY}
+            cudart.lib
+        )
+    elseif(FALCOR_LINUX)
+        target_link_libraries(tensorrt INTERFACE
+            ${TENSORRT_LIBRARY}
+            ${TENSORRT_PARSER_LIBRARY}
+            cudart
+        )
+    endif()
+
+    set(FALCOR_ENABLE_TENSORRT ON PARENT_SCOPE)
+else()
+    message(WARNING "TensorRT not found, real-time denoising will be disabled")
+    set(FALCOR_ENABLE_TENSORRT OFF PARENT_SCOPE)
+endif()

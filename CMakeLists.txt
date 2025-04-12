@@ -217,6 +217,7 @@ message(STATUS "FALCOR_HAS_DLSS: ${FALCOR_HAS_DLSS}")
 message(STATUS "FALCOR_HAS_NV_USD: ${FALCOR_HAS_NV_USD}")
 message(STATUS "FALCOR_HAS_MDL_SDK: ${FALCOR_HAS_MDL_SDK}")
 message(STATUS "FALCOR_ENABLE_USD: ${FALCOR_ENABLE_USD}")
+message(STATUS "FALCOR_ENABLE_TENSORRT: ${FALCOR_ENABLE_TENSORRT}")
 
 # -----------------------------------------------------------------------------
 # Packman dependencies
@@ -470,3 +471,5 @@ endif()
 
 # Make Mogwai the default startup project in VS.
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Mogwai)
+
+

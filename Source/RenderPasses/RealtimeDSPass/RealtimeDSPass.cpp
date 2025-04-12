@@ -25,73 +25,175 @@
  # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
-// #include "RealtimeDSPass.h"
+#include "RealtimeDSPass.h"
 
-// extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
-// {
-//     registry.registerClass<RenderPass, RealtimeDSPass>();
-// }
+namespace {
+    const char kInputColor[] = "inputColor";
+    const char kOutputColor[] = "outputColor";
 
-// RealtimeDSPass::RealtimeDSPass(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice)
-// {
-//     mpDenoiser = std::make_unique<TensorRTDenoiser>(pDevice);
-// }
+    // Compute shader for Splat operation
+    const char kSplatShader[] = R"(
+        RWTexture2D<float4> gOutput;
+        Texture2D<float4> gInput;
+        Texture2D<float> gKernel;
 
-// Properties RealtimeDSPass::getProperties() const
-// {
-//     return {};
-// }
+        cbuffer CB {
+            uint2 gImageSize;
+            uint gKernelSize;
+        };
 
-// RenderPassReflection RealtimeDSPass::reflect(const CompileData& compileData)
-// {
-//     RenderPassReflection reflector;
+        [numthreads(16, 16, 1)]
+        void main(uint3 dispatchThreadId : SV_DispatchThreadID) {
+            if (any(dispatchThreadId.xy >= gImageSize)) return;
 
-//     // 定义输入输出
-//     reflector.addInput("noisy", "Noisy input image").bindFlags(ResourceBindFlags::ShaderResource);
-//     reflector.addInput("albedo", "Surface albedo").bindFlags(ResourceBindFlags::ShaderResource);
-//     reflector.addInput("normal", "Surface normal").bindFlags(ResourceBindFlags::ShaderResource);
+            float4 total = float4(0, 0, 0, 0);
+            int halfKernel = (int)(gKernelSize - 1) / 2;
 
-//     reflector.addOutput("output", "Denoised output image").bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource);
+            for (int i = 0; i < gKernelSize; i++) {
+                for (int j = 0; j < gKernelSize; j++) {
+                    int2 inputPos = int2(dispatchThreadId.xy) + int2(i - halfKernel, j - halfKernel);
+                    if (any(inputPos < 0) || any(inputPos >= gImageSize)) continue;
 
-//     return reflector;
-// }
+                    float kernelValue = gKernel[int2(i, j)];
+                    float4 inputValue = gInput[inputPos];
+                    total += inputValue * kernelValue;
+                }
+            }
 
-// void RealtimeDSPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
-// {
-//     // 初始化降噪器
-//     TensorRTDenoiser::Desc desc;
-//     desc.resolution = {compileData.defaultTexDims.x, compileData.defaultTexDims.y};
-//     desc.modelPath = mModelPath;
+            gOutput[dispatchThreadId.xy] = total;
+        }
+    )";
+}
 
-//     if (!mpDenoiser->init(desc))
-//     {
-//         FALCOR_THROW("Failed to initialize denoiser");
-//     }
-// }
+RealtimeDSPass::RealtimeDSPass(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice)
+{
+    // Initialize properties
+    mModelPath = props.get<std::string>("modelPath", mModelPath);
+    mEnableDenoising = props.get<bool>("enableDenoising", mEnableDenoising);
 
-// void RealtimeDSPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
-// {
-//     if (!mEnableDenoising) return;
+    // Create TensorRT denoiser
+    mpDenoiser = std::make_unique<TensorRTInference>();
+    initDenoiser();
 
-//     // 获取输入输出纹理
-//     const auto& pNoisy = renderData.getTexture("noisy");
-//     const auto& pAlbedo = renderData.getTexture("albedo");
-//     const auto& pNormal = renderData.getTexture("normal");
-//     const auto& pOutput = renderData.getTexture("output");
+    // Create compute program for splat operation
+    Program::Desc desc;
+    desc.addShaderLibrary(kSplatShader).csEntry("main");
+    mpSplatProgram = ComputeProgram::create(mpDevice, desc);
+    mpSplatVars = ComputeVars::create(mpDevice);
+}
 
-//     // 执行降噪
-//     mpDenoiser->denoise(pRenderContext, pNoisy, pAlbedo, pNormal, pOutput);
-// }
+RenderPassReflection RealtimeDSPass::reflect(const CompileData& compileData)
+{
+    RenderPassReflection reflector;
+    reflector.addInput(kInputColor, "Input color buffer").bindFlags(ResourceBindFlags::ShaderResource);
+    reflector.addOutput(kOutputColor, "Denoised output color").bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource);
+    return reflector;
+}
 
-// void RealtimeDSPass::renderUI(Gui::Widgets& widget)
-// {
-//     widget.checkbox("Enable Denoising", mEnableDenoising);
-//     if (widget.textbox("Model Path", mModelPath))
-//     {
-//         // 重新初始化降噪器
-//         TensorRTDenoiser::Desc desc;
-//         desc.resolution = {0, 0}; // 将在compile时更新
-//         desc.modelPath = mModelPath;
-//         mpDenoiser->init(desc);
-//     }
-// }
+void RealtimeDSPass::compile(RenderContext* pRenderContext, const CompileData& compileData)
+{
+    // Create staging buffers based on input dimensions
+    uint32_t width = compileData.defaultTexDims.x;
+    uint32_t height = compileData.defaultTexDims.y;
+
+    mInputBuffer.resize(width * height * 4);  // RGBA
+    mOutputBuffer.resize(width * height * 4);
+}
+
+void RealtimeDSPass::execute(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    // Get input and output textures
+    mpInputColor = renderData[kInputColor]->asTexture();
+    mpOutputColor = renderData[kOutputColor]->asTexture();
+
+    if (!mEnableDenoising || !mpDenoiser)
+    {
+        // Copy input to output if denoising is disabled or denoiser isn't ready
+        pRenderContext->copyResource(mpOutputColor.get(), mpInputColor.get());
+        return;
+    }
+
+    processImage(pRenderContext, renderData);
+}
+
+bool RealtimeDSPass::initDenoiser()
+{
+    if (mModelPath.empty())
+    {
+        logWarning("Model path is empty. Denoising will be disabled.");
+        return false;
+    }
+
+    return mpDenoiser->initializeFromONNX(mModelPath);
+}
+
+void RealtimeDSPass::processImage(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    uint32_t width = mpInputColor->getWidth();
+    uint32_t height = mpInputColor->getHeight();
+
+    // Resize buffers if needed
+    if (mInputBuffer.size() < width * height * 4)
+    {
+        mInputBuffer.resize(width * height * 4);  // RGBA
+        mOutputBuffer.resize(width * height * 4);
+    }
+
+    // Create staging buffer for reading texture data
+    Buffer::SharedPtr pStagingBuffer = Buffer::create(
+        mpDevice,
+        width * height * 4 * sizeof(float),
+        ResourceBindFlags::None,
+        Buffer::CpuAccess::Read
+    );
+
+    // Copy texture to staging buffer
+    pRenderContext->copyResource(pStagingBuffer.get(), mpInputColor.get());
+
+    // Map buffer and copy data to input buffer
+    float* pData = static_cast<float*>(pStagingBuffer->map(Buffer::MapType::Read));
+    std::memcpy(mInputBuffer.data(), pData, width * height * 4 * sizeof(float));
+    pStagingBuffer->unmap();
+
+    // Run inference
+    if (mpDenoiser->infer(mInputBuffer.data(), mOutputBuffer.data()))
+    {
+        // Create staging buffer for writing texture data
+        Buffer::SharedPtr pOutputBuffer = Buffer::create(
+            mpDevice,
+            width * height * 4 * sizeof(float),
+            ResourceBindFlags::None,
+            Buffer::CpuAccess::Write
+        );
+
+        // Copy output data to staging buffer
+        float* pOutData = static_cast<float*>(pOutputBuffer->map(Buffer::MapType::Write));
+        std::memcpy(pOutData, mOutputBuffer.data(), width * height * 4 * sizeof(float));
+        pOutputBuffer->unmap();
+
+        // Copy staging buffer to output texture
+        pRenderContext->copyResource(mpOutputColor.get(), pOutputBuffer.get());
+    }
+    else
+    {
+        // Fallback to input on failure
+        pRenderContext->copyResource(mpOutputColor.get(), mpInputColor.get());
+    }
+}
+
+void RealtimeDSPass::renderUI(Gui::Widgets& widget)
+{
+    widget.checkbox("Enable Denoising", mEnableDenoising);
+    if (widget.textbox("Model Path", mModelPath) && !mModelPath.empty())
+    {
+        initDenoiser();
+    }
+}
+
+Properties RealtimeDSPass::getProperties() const
+{
+    Properties props;
+    props["modelPath"] = mModelPath;
+    props["enableDenoising"] = mEnableDenoising;
+    return props;
+}
